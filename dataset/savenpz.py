@@ -3,9 +3,9 @@ import medpy.io as medio
 
 
 def nii2npz():
-    data_nii_pth  ="E:\mmwhs\mr/1009/image.nii"
-    label_nii_pth ="E:\mmwhs\mr/1009/label.nii"
-    npz_pth       = 'E:\mycode\data\data_np/test_mr\image_mr_1009.nii.gz'
+    data_nii_pth  ="\mr/1009/image.nii"
+    label_nii_pth ="\mr/1009/label.nii"
+    npz_pth       = '\data\data_np/test_mr\image_mr_1009.nii.gz'
 
     data_arr, _  = medio.load(data_nii_pth)
     label_arr, _ = medio.load(label_nii_pth)

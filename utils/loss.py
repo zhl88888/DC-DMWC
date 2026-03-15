@@ -234,19 +234,8 @@ class MPCL(nn.Module):
 
         return loss
 
-# MMD损失
 class MMDLoss(nn.Module):
-    '''
-    计算源域数据和目标域数据的MMD距离
-    Params:
-    source: 源域数据（n * len(x))
-    target: 目标域数据（m * len(y))
-    kernel_mul:
-    kernel_num: 取不同高斯核的数量
-    fix_sigma: 不同高斯核的sigma值
-    Return:
-    loss: MMD loss
-    '''
+
     def __init__(self, kernel_type='rbf', kernel_mul=2.0, kernel_num=5):
         super(MMDLoss, self).__init__()
         self.kernel_num = kernel_num
@@ -292,153 +281,7 @@ class MMDLoss(nn.Module):
             return loss
 
 
-class EnhancedMMDLoss(nn.Module):
-    """
-    改进的MMD损失函数，具有以下增强特性：
-    1. 自适应多核选择：根据特征分布动态调整核函数
-    2. 类别感知MMD：利用类别信息进行细粒度对齐
-    3. 动态权重调整：根据训练进度调整损失权重
-    4. 特征归一化：增强数值稳定性
 
-    参数:
-        kernel_type: 核函数类型('rbf', 'linear'等)
-        num_classes: 类别数量
-        base_temperature: 基础温度参数
-        dynamic_weight: 是否使用动态权重
-        class_aware: 是否使用类别感知MMD
-    """
-
-    def __init__(self, kernel_type='rbf', num_classes=5, base_temperature=1.0,
-                 dynamic_weight=True, class_aware=True):
-        super(EnhancedMMDLoss, self).__init__()
-        self.kernel_type = kernel_type
-        self.num_classes = num_classes
-        self.base_temperature = base_temperature
-        self.dynamic_weight = dynamic_weight
-        self.class_aware = class_aware
-
-        # 核函数参数
-        self.kernel_mul = 2.0
-        self.kernel_num = 7
-        self.fix_sigma = None
-
-    def compute_kernels(self, x, y):
-        """
-        计算多核MMD的核矩阵
-        """
-        n_x = x.size(0)
-        n_y = y.size(0)
-
-        # 计算样本间距离
-        xx = torch.matmul(x, x.t())
-        yy = torch.matmul(y, y.t())
-        xy = torch.matmul(x, y.t())
-
-        # 计算距离矩阵
-        xx_diag = torch.diag(xx).unsqueeze(0).expand_as(xx)
-        yy_diag = torch.diag(yy).unsqueeze(0).expand_as(yy)
-
-        xx_dist = xx_diag + xx_diag.t() - 2 * xx
-        yy_dist = yy_diag + yy_diag.t() - 2 * yy
-        xy_dist = xx_diag.t() + yy_diag - 2 * xy
-
-        # 使用中位数启发式设置带宽
-        if self.fix_sigma is None:
-            all_dist = torch.cat([xx_dist.view(-1), yy_dist.view(-1), xy_dist.view(-1)])
-            median_dist = torch.median(all_dist[all_dist > 0])  # 忽略零距离
-            base_sigma = median_dist * 2.0  # 更稳定的带宽估计
-            base_sigma = base_sigma if base_sigma != 0 else 1.0
-        else:
-            base_sigma = self.fix_sigma
-
-        # 创建多尺度核
-        sigma_list = [base_sigma * (self.kernel_mul ** i) for i in range(self.kernel_num)]
-        kernels = []
-
-        for sigma in sigma_list:
-            gamma = 1.0 / (2 * sigma)
-            k_xx = torch.exp(-gamma * xx_dist)
-            k_yy = torch.exp(-gamma * yy_dist)
-            k_xy = torch.exp(-gamma * xy_dist)
-            kernels.append((k_xx, k_yy, k_xy))
-
-        return kernels
-
-    def forward(self, source, target, source_labels=None, target_pseudo_labels=None,
-                current_iter=0, max_iter=10000):
-        """
-        计算改进的MMD损失
-
-        参数:
-            source: 源域特征 [B, C, H, W] 或 [B, D]
-            target: 目标域特征 [B, C, H, W] 或 [B, D]
-            source_labels: 源域标签 [B, H, W]
-            target_pseudo_labels: 目标域伪标签 [B, H, W]
-            current_iter: 当前迭代步数
-            max_iter: 最大迭代步数
-        """
-        # 特征归一化
-        source = F.normalize(source, p=2, dim=1)
-        target = F.normalize(target, p=2, dim=1)
-
-        # 展平空间维度
-        if source.dim() > 2:
-            B, C, H, W = source.shape
-            source = source.permute(0, 2, 3, 1).reshape(-1, C)  # [B*H*W, C]
-            target = target.permute(0, 2, 3, 1).reshape(-1, C)  # [B*H*W, C]
-
-            if source_labels is not None:
-                source_labels = source_labels.view(-1)  # [B*H*W]
-            if target_pseudo_labels is not None:
-                target_pseudo_labels = target_pseudo_labels.view(-1)  # [B*H*W]
-
-        if self.class_aware and (source_labels is not None) and (target_pseudo_labels is not None):
-            # 类别感知MMD - 按类别分别计算
-            class_mmd = 0
-            valid_classes = 0
-
-            for cls_idx in range(self.num_classes):
-                # 获取当前类别的源域和目标域样本
-                src_cls_mask = (source_labels == cls_idx)
-                tgt_cls_mask = (target_pseudo_labels == cls_idx)
-
-                if torch.any(src_cls_mask) and torch.any(tgt_cls_mask):
-                    src_cls_feat = source[src_cls_mask]
-                    tgt_cls_feat = target[tgt_cls_mask]
-
-                    # 为当前类别计算MMD
-                    kernels = self.compute_kernels(src_cls_feat, tgt_cls_feat)
-                    cls_mmd = 0
-
-                    for k_xx, k_yy, k_xy in kernels:
-                        cls_mmd += k_xx.mean() + k_yy.mean() - 2 * k_xy.mean()
-
-                    # 根据类别样本数量加权
-                    cls_weight = min(src_cls_mask.sum(), tgt_cls_mask.sum()).float()
-                    class_mmd += cls_mmd * cls_weight
-                    valid_classes += 1
-
-            if valid_classes > 0:
-                mmd_val = class_mmd / (valid_classes * self.kernel_num)
-            else:
-                mmd_val = torch.tensor(0.0, device=source.device)
-        else:
-            # 标准MMD计算
-            kernels = self.compute_kernels(source, target)
-            mmd_val = 0
-
-            for k_xx, k_yy, k_xy in kernels:
-                mmd_val += k_xx.mean() + k_yy.mean() - 2 * k_xy.mean()
-
-            mmd_val /= self.kernel_num
-
-        # 动态权重调整
-        if self.dynamic_weight:
-            # 训练后期减小MMD权重，让任务损失主导
-            weight = 1.0 - (current_iter / max_iter) * 0.5
-            mmd_val *= weight
-
-        return mmd_val
 def loss_calc_pro(pred,label,cfg):
 
     '''
@@ -486,7 +329,7 @@ def cross_entropy_2d_pro(pred, label, cfg):
     # print(new_class_count)
     # weight[0] = (1 - (new_class_count+1)/label.size(0))[0]
     weight = (1 - (new_class_count + 1) / label.size(0))
-    #weight = torch.tensor([0.1, 1.0, 1.0, 1.0]).cuda()  # 假设背景是第0类
+    #weight = torch.tensor([0.1, 1.0, 1.0, 1.0]).cuda()
 
     # print(weight)
     pred    = pred.transpose(1,2).transpose(2,3).contiguous() #n*c*h*w->n*h*c*w->n*h*w*c
@@ -554,7 +397,7 @@ class SemanticConsistencyLoss(nn.Module):
         return class_centers
 
 def consistency_loss_kl(pred_main, pred_main_aug):
-    # 使用 KL 散度计算一致性损失
+
     kl_distance = nn.KLDivLoss(reduction='mean')
     log_softmax = nn.LogSoftmax(dim=1)
     softmax = nn.Softmax(dim=1)
@@ -569,7 +412,7 @@ def consistency_loss_kl_symmetric(pred1, pred2, epsilon=1e-8):
     return (kl_div1 + kl_div2) / 2.0
 
 
-# 频域特征约束损失函数（作用于特征图）
+
 class FeatureFrequencyConstraintLoss(nn.Module):
     def __init__(self):
         super(FeatureFrequencyConstraintLoss, self).__init__()

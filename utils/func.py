@@ -78,109 +78,6 @@ def sel_prob_2_entropy(prob):
     return entropy
 
 
-def initialize_class_centers(model, source_loader, num_classes, feature_dim, cfg):
-    """
-    初始化类别中心特征
-    model: 分割模型
-    source_loader: 源域数据加载器
-    num_classes: 类别数量
-    feature_dim: 特征维度
-    """
-    class_centers = torch.zeros(num_classes, feature_dim).cuda()
-    class_counts = torch.zeros(num_classes).cuda()
-
-    model.eval()
-    with torch.no_grad():
-        for batch in tqdm(source_loader):
-            images, labels, _ = batch
-            images = images.cuda()
-            labels = labels.cuda()
-
-            # 提取特征
-            cla_feas_src, _, _ = model(images)
-
-            # 更新类别中心
-            batch_size, num_fea, H, W = cla_feas_src.size()
-            cla_feas_src = cla_feas_src.permute(0, 2, 3, 1).contiguous().view(-1, num_fea)
-            labels = labels.view(-1)
-
-            for i in range(num_classes):
-                class_mask = labels == i
-                if class_mask.sum() > 0:
-                    class_centers[i] += cla_feas_src[class_mask].sum(dim=0)
-                    class_counts[i] += class_mask.sum()
-
-    # 计算平均值
-    for i in range(num_classes):
-        if class_counts[i] > 0:
-            class_centers[i] /= class_counts[i]
-        else:
-            class_centers[i] = torch.randn(feature_dim).cuda()
-
-    return class_centers
-
-
-def update_class_centers(model, images, labels, class_centers, momentum=0.9):
-    """
-    更新类别中心特征
-    model: 分割模型
-    images: 输入图像
-    labels: 标签
-    class_centers: 当前类别中心
-    momentum: 动量系数
-    """
-    with torch.no_grad():
-        # 提取特征
-        cla_feas_src, _, _ = model(images)
-        batch_size, num_fea, H, W = cla_feas_src.size()
-
-        # 展平特征和标签
-        cla_feas_src = cla_feas_src.permute(0, 2, 3, 1).contiguous().view(-1, num_fea)
-        labels = labels.view(-1)
-
-        # 更新类别中心
-        new_class_centers = class_centers.clone()
-        for i in range(class_centers.size(0)):
-            class_mask = labels == i
-            if class_mask.sum() > 0:
-                class_fea = cla_feas_src[class_mask].mean(dim=0)
-                new_class_centers[i] = momentum * class_centers[i] + (1 - momentum) * class_fea
-
-    return new_class_centers
-
-
-def generate_pseudo_label_similarity(cla_feas_trg, class_centers, cfg, threshold=0.8):
-    """
-    基于特征相似性的伪标签生成
-    cla_feas_trg: 目标域特征 (N, C, H, W)
-    class_centers: 类别中心特征 (num_classes, C)
-    threshold: 置信度阈值
-    """
-    cla_feas_trg_de = cla_feas_trg.detach()
-    batch, num_fea, H, W = cla_feas_trg_de.size()
-
-    # 特征归一化
-    cla_feas_trg_de = F.normalize(cla_feas_trg_de.permute(0, 2, 3, 1), p=2, dim=-1)  # (N, H, W, C)
-    cla_feas_trg_de = torch.reshape(cla_feas_trg_de, [-1, num_fea])  # (N*H*W, C)
-    class_centers_norm = F.normalize(class_centers, p=2, dim=1)  # (num_classes, C)
-
-    # 计算相似性矩阵
-    batch_pixel_cosine = torch.matmul(cla_feas_trg_de, class_centers_norm.transpose(0, 1))  # (N*H*W, num_classes)
-
-    # 生成伪标签
-    pseudo_labels = torch.argmax(batch_pixel_cosine, dim=1)  # (N*H*W)
-
-    # 计算置信度
-    confidence = torch.max(F.softmax(batch_pixel_cosine, dim=1), dim=1)[0]
-    confidence_mask = confidence > threshold
-
-    # 筛选高置信度的像素
-    pseudo_labels[~confidence_mask] = -1  # 将低置信度的像素标记为忽略
-
-    # 恢复伪标签的形状
-    pseudo_labels = pseudo_labels.view(batch, H, W)
-
-    return pseudo_labels, confidence_mask
 
 def calculate_mutual_information(prob):
     """ calculate mutual information from probability distributions
@@ -191,8 +88,8 @@ def calculate_mutual_information(prob):
     prob = prob.unsqueeze(3)
     prob_mean = prob_mean.unsqueeze(2)
     mi = torch.sum(prob * torch.log2(prob / (prob_mean + 1e-7) + 1e-7), dim=1)
-    mi = mi.view(n, 1, h, w)  # 确保形状为 [n, 1, h, w]
-    return mi.expand(n, c, h, w)  # 将通道数扩展回 5
+    mi = mi.view(n, 1, h, w) 
+    return mi.expand(n, c, h, w) 
 
 
 
@@ -339,24 +236,7 @@ def fourier_transform(im_local, im_trg, L=0.01, i=1):
     return local_in_trg, trg_in_local
 
 
-def wavelet_transform(source_img, target_img, wavelet='bior3.3', level=2, alpha=0.4):
-    # 对源域和目标域图像进行小波变换分解
-    coeffs_source = pywt.wavedec2(source_img, wavelet, level=level)
-    coeffs_target = pywt.wavedec2(target_img, wavelet, level=level)
 
-    # 融合小波系数（这里使用加权平均，可以根据需要调整）
-    fused_coeffs = []
-    for c_source, c_target in zip(coeffs_source, coeffs_target):
-        if isinstance(c_source, tuple):  # 多级分解的高频系数
-            fused_c = tuple(alpha * np.array(cs) + (1 - alpha) * np.array(ct) for cs, ct in zip(c_source, c_target))
-        else:  # 低频系数
-            fused_c = alpha * np.array(c_source) + (1 - alpha) * np.array(c_target)
-        fused_coeffs.append(fused_c)
-
-    # 利用融合后的小波系数重构图像
-    fused_img = pywt.waverec2(fused_coeffs, wavelet)
-
-    return fused_img
 
 def save_image(image, path):
     plt.imshow(image, cmap='gray')
@@ -392,10 +272,10 @@ def fourier_augmentation(img, tar_img, mode, alpha):
     return aug_img, aug_tar_img
 
 if __name__ == '__main__':
-    mri_img2 = '/mnt/workdir/fengwei/ultra_wide/DA_vessel/data_np/data_np/train_ct/ct_train_slice45.npy'
-    ct_img1 = '/mnt/workdir/fengwei/ultra_wide/DA_vessel/data_np/data_np/train_mr/mr_train_slice4185.npy'
-    ct_mask1 =  '/mnt/workdir/fengwei/ultra_wide/DA_vessel/data_np/data_np/gt_train_ct/ct_train_slice45_gt.npy'
-    mri_mask2 =  '/mnt/workdir/fengwei/ultra_wide/DA_vessel/data_np/data_np/gt_train_mr/mr_train_slice4185_gt.npy'
+    mri_img = ''
+    ct_img = ''
+    ct_mask =  ''
+    mri_mask =  ''
 
     image_size=256
     img_transform = transforms.Compose([
@@ -420,10 +300,10 @@ if __name__ == '__main__':
     # # ct_img1 = (ct_img1 + 1) * 127.5
     # # mri_img2 = (mri_img2 + 1) * 127.5
     # # ct_img_match_his = match_histograms(ct_img1, mri_img2)
-    # # save_image((ct_img_match_his / 255), '/mnt/workdir/fengwei/ultra_wide/DAUDA_IMAGE/mspcl/utils/fourier_img/ct_im_local_match_his.jpg')
+    # # save_image((ct_img_match_his / 255), '')
     # print(ct_img1.max(),ct_img1.min())
     # # print(mri_img2.max(),mri_img2.min())
-    # save_image((ct_img1 / 255), '/mnt/workdir/fengwei/ultra_wide/DAUDA_IMAGE/mspcl/utils/fourier_img/ct_im_local.png')
+    # save_image((ct_img1 / 255), '')
     #
     # print(ct_img1.max(),ct_img1.min(),ct_img1.astype(np.uint8).max(),ct_img1.astype(np.uint8).min())
     # ct_img1 = Image.fromarray(ct_img1.astype(np.uint8))
@@ -433,14 +313,14 @@ if __name__ == '__main__':
     # ct_img1 = np.asarray(ct_img1)
     # mri_img2 = np.asarray(mri_img2)
     #
-    # save_image((ct_img1 / 255),'/mnt/workdir/fengwei/ultra_wide/DAUDA_IMAGE/mspcl/utils/fourier_img/ct_aug_local.png')
+    # save_image((ct_img1 / 255),'')
 
 
 
 
 
     # save_image((aug_local / 255),
-    #            '/mnt/workdir/fengwei/ultra_wide/DAUDA_IMAGE/mspcl/utils/fourier_img/ct_aug_local.jpg')
+    #            'jpg')
     # mri_img2 = img_transform(mri_img2)
 
 
@@ -467,7 +347,7 @@ if __name__ == '__main__':
     # aug_local, aug_traget = fourier_transform(im_local, im_trg, L=0.0125, i=1)
     print(aug_local.max(),aug_local.min(), aug_traget.max(),aug_traget.min())
     # aug_local, aug_traget = colorful_spectrum_mix(im_local, im_trg, alpha=0.5)
-    save_image((im_local / 255),'/mnt/workdir/fengwei/ultra_wide/DAUDA_IMAGE/mspcl/utils/fourier_img/ct_im_local.png')
-    save_image((im_trg / 255),'/mnt/workdir/fengwei/ultra_wide/DAUDA_IMAGE/mspcl/utils/fourier_img/mri_im_trg.png')
-    save_image((aug_local / 255),'/mnt/workdir/fengwei/ultra_wide/DAUDA_IMAGE/mspcl/utils/fourier_img/ct_aug_local.png')
-    save_image((aug_traget / 255),'/mnt/workdir/fengwei/ultra_wide/DAUDA_IMAGE/mspcl/utils/fourier_img/mri_aug_traget.png')
+    save_image((im_local / 255),'png')
+    save_image((im_trg / 255),'png')
+    save_image((aug_local / 255),'png')
+    save_image((aug_traget / 255),'png')

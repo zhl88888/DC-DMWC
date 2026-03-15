@@ -27,9 +27,9 @@ def make_datalist(data_fd, data_list,data_gt_list,gt_fd):
 if __name__ == '__main__':
 
     #Plz change the path follow your setting
-    data_fd      = 'E:\mycode\mmwhs_npy\cyclegan\mr2ct/'
+    data_fd      = '\mmwhs_npy\cyclegan\mr2ct/'
     gt_fd = 'E:\mycode\data\mr_only/train_gt/'
-    data_list    = 'E:\mycode\data\datalist\cyclegan_train_mr2ct.txt'
-    data_gt_list = 'E:\mycode\data\datalist\cyclegan_train_mr2ct_gt.txt'
+    data_list    = '\data\datalist\cyclegan_train_mr2ct.txt'
+    data_gt_list = '\data\datalist\cyclegan_train_mr2ct_gt.txt'
     make_datalist(data_fd, data_list,data_gt_list, gt_fd)
 

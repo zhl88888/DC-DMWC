@@ -1,8 +1,8 @@
 import sys
 import os
-curPath = os.path.abspath(os.path.dirname(__file__)) # 获取当前绝对路径C
+curPath = os.path.abspath(os.path.dirname(__file__)) 
 sys.path.append(curPath)
-rootPath = os.path.split(curPath)[0]				 # 上一级目录B
+rootPath = os.path.split(curPath)[0]				
 sys.path.append(rootPath)
 sys.path.append(os.path.split(rootPath)[0])
 import argparse
@@ -24,7 +24,7 @@ def get_arguments():
     parser = argparse.ArgumentParser(description="Code for domain adaptation (DA) training")
     parser.add_argument('--pretrained_model_pth', type=str,
         # default='/mnt/workdir/fengwei/ultra_wide/DAUDA_IMAGE/mspcl/scripts/experiments/snapshots/CT2MR1/MT_CT2MR/model_4000.pth',
-     default=r"E:\mycode\scripts\experiments\mycode_mmwhs\CT2MR\oursmmwhs_CT2MR_seg+adv\model_1500.pth",
+     default=r"model_1500.pth",
                         help='optional config file', )
     parser.add_argument('--target_modality', type=str, default='MR',
                         help='optional modality', )
@@ -45,20 +45,20 @@ def main():
     target_modality = args.target_modality
 
     if target_modality == 'CT':
-        test_list_pth = 'E:\SE_ASA-main\data\datalist/test_ct.txt'
+        test_list_pth = '\data\datalist/test_ct.txt'
 
     if target_modality == 'MR':
-        test_list_pth = 'E:\SE_ASA-main\data\datalist/test_mr.txt'
+        test_list_pth = '\data\datalist/test_mr.txt'
 
     if target_modality == 't2':
-        test_list_pth = r'E:\brats18\brats18\test\brats_test_t2.txt'
+        test_list_pth = r'\brats_test_t2.txt'
     if target_modality == 'flair':
-        test_list_pth =r'E:\brats18\brats18\test\brats_test_flair.txt'
+        test_list_pth =r'\brats_test_flair.txt'
 
     if target_modality == 'hk':
-        test_list_pth = r'E:\SE_ASA-main\data\datalist\pro12\hk_test.txt'
+        test_list_pth = r'\data\datalist\pro12\hk_test.txt'
     if target_modality == 'bidmc':
-        test_list_pth = r'E:\SE_ASA-main\data\datalist\pro12\bidmc_test.txt'
+        test_list_pth = r'\data\datalist\pro12\bidmc_test.txt'
 
     with open(test_list_pth) as fp:
         rows = fp.readlines()

@@ -13,6 +13,6 @@ def make_datalist(root_dir,data_list):
 if __name__ == '__main__':
 
     #Plz change the path follow your setting
-    data_fd   = 'E:\mycode\mmwhs/npz\ct/' # data folder'
-    data_list = 'E:\mycode\data\datalist/ct.txt'  # txt file pth
+    data_fd   = '\mmwhs/npz\ct/' # data folder'
+    data_list = '\data\datalist/ct.txt'  # txt file pth
     make_datalist(data_fd, data_list)

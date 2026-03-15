@@ -2,9 +2,9 @@ import sys
 import os
 
 
-curPath = os.path.abspath(os.path.dirname(__file__)) # 获取当前绝对路径C
+curPath = os.path.abspath(os.path.dirname(__file__)) 
 sys.path.append(curPath)
-rootPath = os.path.split(curPath)[0]				 # 上一级目录B
+rootPath = os.path.split(curPath)[0]			
 sys.path.append(rootPath)
 sys.path.append(os.path.split(rootPath)[0])
 import argparse
@@ -31,7 +31,7 @@ def get_arguments():
     Parse input arguments
     """
     parser = argparse.ArgumentParser(description="Code for domain adaptation (DA) training")
-    parser.add_argument('--cfg', type=str, default=r'E:\mycode\scripts\configs\ours_CT2MR.yml',
+    parser.add_argument('--cfg', type=str, default=r'\scripts\configs\ours_CT2MR.yml',
                         help='optional config file', )
     parser.add_argument("--random-train", action="store_true",
                         help="not fixing random seed.")
@@ -114,14 +114,14 @@ def main():
         raise NotImplementedError(f"Not yet supported {cfg.TRAIN.MODEL}")
 
     # DataLoaders
-    train_mr_data_pth = 'E:\mycode\data\datalist/train_mr.txt'
-    train_ct_data_pth = 'E:\mycode\data\datalist/train_ct.txt'
-    train_mr_gt_pth = 'E:\mycode\data\datalist/train_mr_gt.txt'
-    train_ct_gt_pth = 'E:\mycode\data\datalist/train_ct_gt.txt'
-    val_mr_data_pth   = 'E:\mycode/data/datalist/val_mr.txt'
-    val_ct_data_pth   = 'E:\mycode/data/datalist/val_ct.txt'
-    val_mr_gt_pth     = 'E:\mycode/data/datalist/val_mr_gt.txt'
-    val_ct_gt_pth     = 'E:\mycode/data/datalist/val_ct_gt.txt'
+    train_mr_data_pth = '\data\datalist/train_mr.txt'
+    train_ct_data_pth = '\data\datalist/train_ct.txt'
+    train_mr_gt_pth = '\data\datalist/train_mr_gt.txt'
+    train_ct_gt_pth = '\data\datalist/train_ct_gt.txt'
+    val_mr_data_pth   = '/data/datalist/val_mr.txt'
+    val_ct_data_pth   = '/data/datalist/val_ct.txt'
+    val_mr_gt_pth     = '/data/datalist/val_mr_gt.txt'
+    val_ct_gt_pth     = '/data/datalist/val_ct_gt.txt'
 
 
     transforms = None
@@ -284,10 +284,10 @@ def main_pro():
         raise NotImplementedError(f"Not yet supported {cfg.TRAIN.MODEL}")
 
     # DataLoaders for brats
-    train_hk_data_pth = r'E:\SE_ASA-main\data\datalist\pro12\train_hk.txt'
-    train_bidmc_data_pth = r'E:\SE_ASA-main\data\datalist\pro12\train_bidmc.txt'
-    train_hk_gt_pth = r'E:\SE_ASA-main\data\datalist\pro12\train_hk_gt.txt'
-    train_bidmc_gt_pth = r'E:\SE_ASA-main\data\datalist\pro12\train_bidmc_gt.txt'
+    train_hk_data_pth = r'\data\datalist\pro12\train_hk.txt'
+    train_bidmc_data_pth = r'\data\datalist\pro12\train_bidmc.txt'
+    train_hk_gt_pth = r'\data\datalist\pro12\train_hk_gt.txt'
+    train_bidmc_gt_pth = r'\data\datalist\pro12\train_bidmc_gt.txt'
 
 
     transforms = None
@@ -420,23 +420,23 @@ def main_brats():
 
     # DataLoaders for brats
     if cfg.SOURCE == 't2':
-        train_t2_data_pth = r"E:\brats18\brats18\npy\brats_train_t2.txt"
-        train_tar_data_pth = r"E:\brats18\brats18\npy\brats_train_flair.txt"
+        train_t2_data_pth = r"\brats18\npy\brats_train_t2.txt"
+        train_tar_data_pth = r"\brats18\npy\brats_train_flair.txt"
 
-        train_t2_gt_pth = r"E:\brats18\brats18\npy\brats_train_t2_gt.txt"
-        train_tar_gt_pth = r"E:\brats18\brats18\npy\brats_train_flair_gt.txt"
+        train_t2_gt_pth = r"\brats18\npy\brats_train_t2_gt.txt"
+        train_tar_gt_pth = r"\brats18\npy\brats_train_flair_gt.txt"
     elif cfg.SOURCE == 'flair':
-        train_t2_data_pth = r"E:\brats18\brats18\npy\brats_train_flair.txt"
+        train_t2_data_pth = r"\brats18\npy\brats_train_flair.txt"
 
-        train_tar_data_pth = r"E:\brats18\brats18\npy\brats_train_t2.txt"
+        train_tar_data_pth = r"\brats18\npy\brats_train_t2.txt"
 
-        train_t2_gt_pth = r"E:\brats18\brats18\npy\brats_train_flair_gt.txt"
-        train_tar_gt_pth = r"E:\brats18\brats18\npy\brats_train_t2_gt.txt"
+        train_t2_gt_pth = r"\brats18\npy\brats_train_flair_gt.txt"
+        train_tar_gt_pth = r"\brats18\npy\brats_train_t2_gt.txt"
 
-    val_t2_data_pth = r'E:\SE_ASA-main\data\datalist\brats_val_t2.txt'
-    val_tar_data_pth = r'E:\SE_ASA-main\data\datalist\brats_val_t1ce.txt'
-    val_t2_gt_pth = r'E:\SE_ASA-main\data\datalist\brats_val_t2_gt.txt'
-    val_tar_gt_pth = r'E:\SE_ASA-main\data\datalist\brats_val_t1ce_gt.txt'
+    val_t2_data_pth = r'\data\datalist\brats_val_t2.txt'
+    val_tar_data_pth = r'\data\datalist\brats_val_t1ce.txt'
+    val_t2_gt_pth = r'\data\datalist\brats_val_t2_gt.txt'
+    val_tar_gt_pth = r'\data\datalist\brats_val_t1ce_gt.txt'
 
 
 

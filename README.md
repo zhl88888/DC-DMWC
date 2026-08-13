@@ -1,5 +1,5 @@
 
-# DMWCC: Reproducibility Guide
+# DMWCC
 
 PyTorch implementation of *Unsupervised Domain Adaptation for Medical Image Segmentation via Dynamic Matrix and Wavelet Consistency Constraints*. DMWCC uses a DeepLabv2 backbone, dynamic matrix feature enhancement (DMFE), wavelet consistency, adversarial alignment, and MK-MMD.
 
